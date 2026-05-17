@@ -41,12 +41,12 @@ services:
       retries: 3
       start_period: 15s
     depends_on:
-      postgres:
+      document-db:
         condition: service_healthy
       redis:
         condition: service_healthy
     environment:
-      - DB_HOST=saga-db
+      - DB_HOST=document-db
       - DB_PORT=5432
       - REDIS_HOST=redis
       - REDIS_PORT=6379
