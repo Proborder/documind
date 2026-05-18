@@ -16,16 +16,27 @@ class AnthropicClient:
         self.model = model
         self.max_tokens = max_tokens
 
+    @property
+    def client(self) -> AsyncAnthropic:
+        if not hasattr(self, "_anthropic_client"):
+            raise RuntimeError("Anthropic client is not initialized")
+        return self._anthropic_client
+
     async def setup(self) -> None:
         self._anthropic_client = AsyncAnthropic(api_key=self.api_key)
 
-    async def create_message(self, messages: Iterable[MessageParam]) -> Any:
+    async def create_message(self, messages: Iterable[MessageParam], **kwargs: Any) -> Any:
         logger.info("llm_request_started", model=self.model)
-        message = await self._anthropic_client.messages.create(
-            max_tokens=self.max_tokens,
-            model=self.model,
-            messages=messages
-        )
+        try:
+            message = await self.client.messages.create(
+                max_tokens=self.max_tokens,
+                model=self.model,
+                messages=messages,
+                **kwargs
+            )
+        except Exception:
+            logger.exception("llm_request_failed", model=self.model)
+            raise
         logger.info("llm_request_finished", model=self.model)
         return message
 

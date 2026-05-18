@@ -3,7 +3,8 @@ from fastapi import APIRouter
 from app.core.config import settings
 from app.core.logger import logger
 
-router = APIRouter(tags=["health"])
+router = APIRouter(prefix="/health", tags=["health"])
+
 
 @router.get("/ping")
 async def ping():
