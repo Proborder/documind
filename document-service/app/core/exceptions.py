@@ -20,6 +20,18 @@ class RequestNotFoundException(ServiceDocumentExceptions):
     detail = "Запрос не найден"
 
 
+class UnknownExtractionSchemaException(ServiceDocumentExceptions):
+    detail = "Неизвестная схема извлечения"
+
+
+class ToolUseNotFoundException(ServiceDocumentExceptions):
+    detail = "Модель не вернула structured output через tool_use"
+
+
+class StructuredOutputValidationException(ServiceDocumentExceptions):
+    detail = "Structured output не прошёл валидацию"
+
+
 class ServiceDocumentHTTPExceptions(HTTPException):
     status_code = 500
     detail = None
@@ -36,3 +48,18 @@ class DatabaseNotUnavailableHTTPException(ServiceDocumentHTTPExceptions):
 class RequestNotFoundHTTPException(ServiceDocumentHTTPExceptions):
     status_code = 404
     detail = "Запрос не найден"
+
+
+class UnknownExtractionSchemaHTTPException(ServiceDocumentHTTPExceptions):
+    status_code = 400
+    detail = "Неизвестная схема извлечения"
+
+
+class ToolUseNotFoundHTTPException(ServiceDocumentHTTPExceptions):
+    status_code = 422
+    detail = "Модель не вернула structured output через tool_use"
+
+
+class StructuredOutputValidationHTTPException(ServiceDocumentHTTPExceptions):
+    status_code = 422
+    detail = "Structured output не прошёл валидацию"

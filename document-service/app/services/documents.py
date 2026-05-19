@@ -1,23 +1,43 @@
 import hashlib
 import json
-import socket
+from typing import Any
 
 from anthropic.types import MessageParam
+from pydantic import ValidationError
 from redis.exceptions import RedisError
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.config import settings
-from app.core.exceptions import DatabaseNotUnavailableException
+from app.core.exceptions import (
+    DatabaseNotUnavailableException,
+    StructuredOutputValidationException,
+    ToolUseNotFoundException,
+    UnknownExtractionSchemaException,
+)
 from app.core.logger import logger
 from app.core.redis_conn import redis_manager
+from app.schemas.extraction import ContractData, ExtractRequest, ExtractResponse, InvoiceData
 from app.schemas.requests import AnalyzeAdd, AnalyzeRequest, AnalyzeResponse, Usage
 from app.services.base import BaseService
 
 
 class DocumentService(BaseService):
-    async def analyze(self, data: AnalyzeRequest) -> AnalyzeResponse:
-        text_hash = hashlib.sha256(data.text.encode("utf-8")).hexdigest()
-        instruction_hash = hashlib.sha256(data.instruction.encode("utf-8")).hexdigest()
+    extraction_tools: dict[str, dict[str, Any]] = {
+        "invoice": {
+            "model": InvoiceData,
+            "name": "extract_invoice",
+            "description": "Extract structured invoice data from document text",
+        },
+        "contract": {
+            "model": ContractData,
+            "name": "extract_contract",
+            "description": "Extract structured contract data from document text",
+        },
+    }
+
+    async def analyze(self, payload: AnalyzeRequest) -> AnalyzeResponse:
+        text_hash = hashlib.sha256(payload.text.encode("utf-8")).hexdigest()
+        instruction_hash = hashlib.sha256(payload.instruction.encode("utf-8")).hexdigest()
 
         key = f"requests:analyze:{text_hash}:{instruction_hash}"
         request_from_cache = None
@@ -35,9 +55,9 @@ class DocumentService(BaseService):
         try:
             existing_request = await self.db.requests.get_one_or_none(
                 text_hash=text_hash,
-                instruction=data.instruction
+                instruction=payload.instruction
             )
-        except (SQLAlchemyError, socket.error) as ex:
+        except (SQLAlchemyError, OSError) as ex:
             logger.error("Database connection error during request lookup", error=str(ex))
             raise DatabaseNotUnavailableException from ex
 
@@ -65,8 +85,8 @@ class DocumentService(BaseService):
             "Keep the output concise and structured."
         )
         user_prompt = (
-            f"Instruction:\n{data.instruction}\n\n"
-            f"Document text:\n{data.text}"
+            f"Instruction:\n{payload.instruction}\n\n"
+            f"Document text:\n{payload.text}"
         )
         messages: list[MessageParam] = [{"role": "user", "content": user_prompt}]
 
@@ -78,7 +98,7 @@ class DocumentService(BaseService):
         try:
             add_data = AnalyzeAdd(
                 text_hash=text_hash,
-                instruction=data.instruction,
+                instruction=payload.instruction,
                 response=analysis,
                 model=llm_response.model,
                 input_tokens=llm_response.usage.input_tokens,
@@ -86,7 +106,7 @@ class DocumentService(BaseService):
             )
             saved_request = await self.db.requests.add(add_data)
             await self.db.commit()
-        except (SQLAlchemyError, socket.error) as ex:
+        except (SQLAlchemyError, OSError) as ex:
             logger.error("Database connection error during request save", error=str(ex))
             raise DatabaseNotUnavailableException from ex
 
@@ -106,6 +126,54 @@ class DocumentService(BaseService):
             logger.warning("Redis is unavailable", error=str(ex))
 
         return response
+
+    async def extract(self, data: ExtractRequest) -> ExtractResponse:
+        tool_config = self.extraction_tools.get(data.schema_name)
+        if tool_config is None:
+            raise UnknownExtractionSchemaException
+
+        schema_model = tool_config["model"]
+        tool_name = str(tool_config["name"])
+        tool = {
+            "name": tool_name,
+            "description": tool_config["description"],
+            "input_schema": schema_model.model_json_schema()
+        }
+        system_prompt = (
+            "You extract structured data from documents. "
+            "Use the provided tool only. "
+            "If a nullable field is not present in the document, set it to null. "
+            "If a list field has no values, return an empty list."
+        )
+        messages: list[MessageParam] = [
+            {
+                "role": "user",
+                "content": f"Extract structured data from this document:\n\n{data.text}"
+            }
+        ]
+
+        llm_response = await self.llm_client.create_message(
+            messages=messages,
+            system=system_prompt,
+            tools=[tool],
+            tool_choice={"type": "tool", "name": tool_name}
+        )
+
+        if llm_response.stop_reason != "tool_use":
+            raise ToolUseNotFoundException
+
+        for block in llm_response.content:
+            if (
+                getattr(block, "type", None) == "tool_use"
+                and getattr(block, "name", None) == tool_name
+            ):
+                try:
+                    return schema_model.model_validate(block.input)
+                except ValidationError as ex:
+                    logger.warning("structured_output_validation_failed", error=str(ex))
+                    raise StructuredOutputValidationException from ex
+
+        raise ToolUseNotFoundException
 
     @staticmethod
     def _extract_text(content) -> str:
