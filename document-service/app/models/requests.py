@@ -1,8 +1,8 @@
-from datetime import datetime
 import uuid
+from datetime import datetime
 
 from sqlalchemy import Text, UniqueConstraint, func
-from sqlalchemy.orm import mapped_column, Mapped
+from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
 

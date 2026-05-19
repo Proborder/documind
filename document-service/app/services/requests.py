@@ -1,9 +1,12 @@
-import socket
 import uuid
 
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.core.exceptions import ObjectNotFoundException, RequestNotFoundException, DatabaseNotUnavailableException
+from app.core.exceptions import (
+    DatabaseNotUnavailableException,
+    ObjectNotFoundException,
+    RequestNotFoundException,
+)
 from app.core.logger import logger
 from app.schemas.requests import Analyze
 from app.services.base import BaseService
@@ -16,6 +19,6 @@ class RequestsService(BaseService):
             return data
         except ObjectNotFoundException as ex:
             raise RequestNotFoundException from ex
-        except (SQLAlchemyError, socket.error) as ex:
+        except (SQLAlchemyError, OSError) as ex:
             logger.error("Database connection error during fetch", error=str(ex))
             raise DatabaseNotUnavailableException from ex

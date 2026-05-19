@@ -2,13 +2,13 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from app.api.documents import router as documents_router
+from app.api.health import router as health_router
 from app.api.middleware import LoggingMiddleware
 from app.api.requests import router as requests_router
 from app.core.logger import logger
 from app.core.redis_conn import redis_manager
 from app.llm.client import anthropic_client
-from app.api.health import router as health_router
-from app.api.documents import router as documents_router
 
 
 @asynccontextmanager
