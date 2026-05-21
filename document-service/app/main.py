@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from app.api.agent import router as agent_router
 from app.api.documents import router as documents_router
 from app.api.health import router as health_router
 from app.api.middleware import LoggingMiddleware
@@ -36,3 +37,4 @@ app.add_middleware(LoggingMiddleware)
 app.include_router(health_router, prefix="/api/v1")
 app.include_router(documents_router, prefix="/api/v1")
 app.include_router(requests_router, prefix="/api/v1")
+app.include_router(agent_router, prefix="/api/v1")

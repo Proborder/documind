@@ -13,7 +13,7 @@ from app.core.exceptions import (
     DatabaseNotUnavailableException,
     StructuredOutputValidationException,
     ToolUseNotFoundException,
-    UnknownExtractionSchemaException
+    UnknownExtractionSchemaException,
 )
 from app.core.logger import logger
 from app.core.redis_conn import redis_manager
@@ -25,7 +25,7 @@ from app.schemas.requests import (
     StreamDeltaEvent,
     StreamDoneEvent,
     StreamErrorEvent,
-    Usage
+    Usage,
 )
 from app.services.base import BaseService
 
@@ -215,10 +215,7 @@ class DocumentService(BaseService):
             raise ToolUseNotFoundException
 
         for block in llm_response.content:
-            if (
-                getattr(block, "type", None) == "tool_use"
-                and getattr(block, "name", None) == tool_name
-            ):
+            if block.type == "tool_use" and block.name == tool_name:
                 try:
                     return schema_model.model_validate(block.input)
                 except ValidationError as ex:
@@ -231,6 +228,6 @@ class DocumentService(BaseService):
     def _extract_text(content) -> str:
         analysis = ""
         for block in content:
-            if getattr(block, "type", None) == "text":
+            if block.type == "text":
                 analysis += block.text
         return analysis

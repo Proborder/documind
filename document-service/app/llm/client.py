@@ -1,10 +1,11 @@
 from collections.abc import Iterable
 from typing import Any
 
-from anthropic import AsyncAnthropic
+from anthropic import AnthropicError, AsyncAnthropic
 from anthropic.types import MessageParam
 
 from app.core.config import settings
+from app.core.exceptions import LLMProviderException
 from app.core.logger import logger
 
 
@@ -34,6 +35,13 @@ class AnthropicClient:
                 messages=messages,
                 **kwargs
             )
+        except AnthropicError as ex:
+            logger.warning(
+                "llm_provider_error",
+                model=self.model,
+                error=str(ex)
+            )
+            raise LLMProviderException from ex
         except Exception:
             logger.exception("llm_request_failed", model=self.model)
             raise

@@ -32,6 +32,10 @@ class StructuredOutputValidationException(ServiceDocumentExceptions):
     detail = "Structured output не прошёл валидацию"
 
 
+class LLMProviderException(ServiceDocumentExceptions):
+    detail = "Ошибка провайдера LLM"
+
+
 class ServiceDocumentHTTPExceptions(HTTPException):
     status_code = 500
     detail = None
@@ -63,3 +67,8 @@ class ToolUseNotFoundHTTPException(ServiceDocumentHTTPExceptions):
 class StructuredOutputValidationHTTPException(ServiceDocumentHTTPExceptions):
     status_code = 422
     detail = "Structured output не прошёл валидацию"
+
+
+class LLMProviderHTTPException(ServiceDocumentHTTPExceptions):
+    status_code = 502
+    detail = "Ошибка провайдера LLM"
