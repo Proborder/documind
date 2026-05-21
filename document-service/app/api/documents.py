@@ -1,4 +1,5 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
+from fastapi.responses import StreamingResponse
 
 from app.api.dependencies import DBDep, LLMClientDep
 from app.core.exceptions import (
@@ -24,6 +25,25 @@ async def analyze(db: DBDep, llm_client: LLMClientDep, payload: AnalyzeRequest) 
         return await DocumentService(db, llm_client).analyze(payload)
     except DatabaseNotUnavailableException as ex:
         raise DatabaseNotUnavailableHTTPException from ex
+
+
+@router.post("/analyze/stream")
+async def analyze_stream(
+    request: Request,
+    llm_client: LLMClientDep,
+    payload: AnalyzeRequest
+) -> StreamingResponse:
+    return StreamingResponse(
+        DocumentService(llm_client=llm_client).analyze_stream(
+            payload=payload,
+            is_disconnected=request.is_disconnected
+        ),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no"
+        }
+    )
 
 
 @router.post("/extract", response_model=ExtractResponse)

@@ -40,6 +40,15 @@ class AnthropicClient:
         logger.info("llm_request_finished", model=self.model)
         return message
 
+    def stream_message(self, messages: Iterable[MessageParam], **kwargs: Any) -> Any:
+        logger.info("llm_stream_started", model=self.model)
+        return self.client.messages.stream(
+            max_tokens=self.max_tokens,
+            model=self.model,
+            messages=messages,
+            **kwargs
+        )
+
 
 anthropic_client = AnthropicClient(
     api_key=settings.ANTHROPIC_API_KEY,

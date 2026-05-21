@@ -1,5 +1,6 @@
 import hashlib
 import json
+from collections.abc import AsyncGenerator, Awaitable, Callable
 from typing import Any
 
 from anthropic.types import MessageParam
@@ -12,12 +13,20 @@ from app.core.exceptions import (
     DatabaseNotUnavailableException,
     StructuredOutputValidationException,
     ToolUseNotFoundException,
-    UnknownExtractionSchemaException,
+    UnknownExtractionSchemaException
 )
 from app.core.logger import logger
 from app.core.redis_conn import redis_manager
 from app.schemas.extraction import ContractData, ExtractRequest, ExtractResponse, InvoiceData
-from app.schemas.requests import AnalyzeAdd, AnalyzeRequest, AnalyzeResponse, Usage
+from app.schemas.requests import (
+    AnalyzeAdd,
+    AnalyzeRequest,
+    AnalyzeResponse,
+    StreamDeltaEvent,
+    StreamDoneEvent,
+    StreamErrorEvent,
+    Usage
+)
 from app.services.base import BaseService
 
 
@@ -126,6 +135,49 @@ class DocumentService(BaseService):
             logger.warning("Redis is unavailable", error=str(ex))
 
         return response
+
+    async def analyze_stream(
+        self,
+        payload: AnalyzeRequest,
+        is_disconnected: Callable[[], Awaitable[bool]]
+    ) -> AsyncGenerator[str, None]:
+        system_prompt = (
+            "You are a precise document analyst. "
+            "Extract key points, risks, ambiguities, and actionable recommendations. "
+            "Keep the output concise and structured."
+        )
+        user_prompt = (
+            f"Instruction:\n{payload.instruction}\n\n"
+            f"Document text:\n{payload.text}"
+        )
+        messages: list[MessageParam] = [{"role": "user", "content": user_prompt}]
+
+        try:
+            async with self.llm_client.stream_message(
+                messages=messages,
+                system=system_prompt
+            ) as stream:
+                async for text in stream.text_stream:
+                    if await is_disconnected():
+                        logger.info("client_disconnected_from_stream")
+                        return
+
+                    event = StreamDeltaEvent(text=text)
+                    yield f"data: {event.model_dump_json()}\n\n"
+
+                final_message = await stream.get_final_message()
+                event = StreamDoneEvent(
+                    usage=Usage(
+                        input_tokens=final_message.usage.input_tokens,
+                        output_tokens=final_message.usage.output_tokens,
+                    )
+                )
+                yield f"data: {event.model_dump_json()}\n\n"
+                logger.info("llm_stream_finished", model=self.llm_client.model)
+        except Exception as ex:
+            logger.exception("llm_stream_failed")
+            event = StreamErrorEvent(message=str(ex))
+            yield f"data: {event.model_dump_json()}\n\n"
 
     async def extract(self, data: ExtractRequest) -> ExtractResponse:
         tool_config = self.extraction_tools.get(data.schema_name)

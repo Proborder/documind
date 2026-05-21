@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
@@ -19,6 +20,21 @@ class AnalyzeResponse(BaseModel):
     model: str
     usage: Usage
     request_id: str
+
+
+class StreamDeltaEvent(BaseModel):
+    type: Literal["delta"] = "delta"
+    text: str
+
+
+class StreamDoneEvent(BaseModel):
+    type: Literal["done"] = "done"
+    usage: Usage
+
+
+class StreamErrorEvent(BaseModel):
+    type: Literal["error"] = "error"
+    message: str
 
 
 class AnalyzeAdd(BaseModel):
