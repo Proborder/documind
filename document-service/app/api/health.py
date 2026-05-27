@@ -29,7 +29,7 @@ async def ready(db: DBDep) -> JSONResponse:
     status_code = status.HTTP_200_OK
 
     try:
-        db.session.execute(text("SELECT 1"))
+        await db.session.execute(text("SELECT 1"))
     except Exception as ex:
         logger.warning("Readiness check failed: PostgreSQL is unavailable", error=ex)
         checks["postgresql"] = "Unavailable"
