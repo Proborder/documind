@@ -1,5 +1,6 @@
 import hashlib
 import json
+import re
 from collections.abc import AsyncGenerator, Awaitable, Callable
 from typing import Any
 
@@ -89,9 +90,11 @@ class DocumentService(BaseService):
             return response
 
         system_prompt = (
-            "You are a precise document analyst. "
-            "Extract key points, risks, ambiguities, and actionable recommendations. "
-            "Keep the output concise and structured."
+            "You are a precise document extraction engine. "
+            "Return only valid minified JSON. "
+            "Do not use markdown. "
+            "Do not wrap the JSON in code fences. "
+            "Do not add explanations."
         )
         user_prompt = (
             f"Instruction:\n{payload.instruction}\n\n"
@@ -103,12 +106,15 @@ class DocumentService(BaseService):
             messages=messages,
             system=system_prompt
         )
-        analysis = self._extract_text(llm_response.content)
+
+        raw_analysis = self._extract_text(llm_response.content)
+        analysis = self._parse_json_response(raw_analysis)
+
         try:
             add_data = AnalyzeAdd(
                 text_hash=text_hash,
                 instruction=payload.instruction,
-                response=analysis,
+                response=json.dumps(analysis, ensure_ascii=False),
                 model=llm_response.model,
                 input_tokens=llm_response.usage.input_tokens,
                 output_tokens=llm_response.usage.output_tokens
@@ -142,9 +148,11 @@ class DocumentService(BaseService):
         is_disconnected: Callable[[], Awaitable[bool]]
     ) -> AsyncGenerator[str, None]:
         system_prompt = (
-            "You are a precise document analyst. "
-            "Extract key points, risks, ambiguities, and actionable recommendations. "
-            "Keep the output concise and structured."
+            "You are a precise document extraction engine. "
+            "Return only valid minified JSON. "
+            "Do not use markdown. "
+            "Do not wrap the JSON in code fences. "
+            "Do not add explanations."
         )
         user_prompt = (
             f"Instruction:\n{payload.instruction}\n\n"
@@ -231,3 +239,24 @@ class DocumentService(BaseService):
             if block.type == "text":
                 analysis += block.text
         return analysis
+
+    @staticmethod
+    def _parse_json_response(raw_text: str) -> dict[str, Any]:
+        cleaned = raw_text.strip()
+
+        cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned)
+        cleaned = re.sub(r"\s*```$", "", cleaned)
+        cleaned = cleaned.strip()
+
+        try:
+            parsed = json.loads(cleaned)
+        except json.JSONDecodeError as ex:
+            raise LLMInvalidResponseError(f"LLM returned invalid JSON: {cleaned[:300]}") from ex
+
+        if not isinstance(parsed, dict):
+            raise LLMInvalidResponseError(f"LLM returned JSON, but not an object: {type(parsed).__name__}")
+
+        return parsed
+
+class LLMInvalidResponseError(Exception):
+    pass
