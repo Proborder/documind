@@ -16,7 +16,7 @@ class Usage(BaseModel):
 
 
 class AnalyzeResponse(BaseModel):
-    analysis: str
+    analysis: dict
     model: str
     usage: Usage
     request_id: str

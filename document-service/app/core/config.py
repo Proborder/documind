@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     CACHE_TTL_SECONDS: int = 3600
 
     AGENT_MAX_ITERATIONS: int
+    LLM_MAX_ATTEMPTS: int
 
     @property
     def DATABASE_URL(self):

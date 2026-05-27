@@ -4,7 +4,7 @@ from typing import Annotated
 from fastapi import Depends
 
 from app.core.database import async_session_maker
-from app.llm.client import AnthropicClient, anthropic_client
+from app.llm.client import LLMClient, llm_client
 from app.services.db_manager import DBManager
 
 
@@ -16,8 +16,8 @@ async def get_db() -> AsyncGenerator[DBManager, None]:
 DBDep = Annotated[DBManager, Depends(get_db)]
 
 
-def get_llm_client() -> AnthropicClient:
-    return anthropic_client
+def get_llm_client() -> LLMClient:
+    return llm_client
 
 
-LLMClientDep = Annotated[AnthropicClient, Depends(get_llm_client)]
+LLMClientDep = Annotated[LLMClient, Depends(get_llm_client)]

@@ -5,8 +5,6 @@ from app.api.dependencies import DBDep, LLMClientDep
 from app.core.exceptions import (
     DatabaseNotUnavailableException,
     DatabaseNotUnavailableHTTPException,
-    LLMProviderException,
-    LLMProviderHTTPException,
     StructuredOutputValidationException,
     StructuredOutputValidationHTTPException,
     ToolUseNotFoundException,
@@ -27,8 +25,6 @@ async def analyze(db: DBDep, llm_client: LLMClientDep, payload: AnalyzeRequest) 
         return await DocumentService(db, llm_client).analyze(payload)
     except DatabaseNotUnavailableException as ex:
         raise DatabaseNotUnavailableHTTPException from ex
-    except LLMProviderException as ex:
-        raise LLMProviderHTTPException from ex
 
 
 @router.post("/analyze/stream")
@@ -54,8 +50,6 @@ async def analyze_stream(
 async def extract(data: ExtractRequest, llm_client: LLMClientDep) -> ExtractResponse:
     try:
         return await DocumentService(llm_client=llm_client).extract(data)
-    except LLMProviderException as ex:
-        raise LLMProviderHTTPException from ex
     except UnknownExtractionSchemaException as ex:
         raise UnknownExtractionSchemaHTTPException from ex
     except ToolUseNotFoundException as ex:
