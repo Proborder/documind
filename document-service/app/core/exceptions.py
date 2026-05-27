@@ -32,8 +32,15 @@ class StructuredOutputValidationException(ServiceDocumentExceptions):
     detail = "Structured output не прошёл валидацию"
 
 
-class LLMProviderException(ServiceDocumentExceptions):
-    detail = "Ошибка провайдера LLM"
+class LLMUnavailableError(ServiceDocumentExceptions):
+    detail = "LLM service unavailable"
+
+    def __init__(self, detail: str | None = None):
+        self.detail = detail or self.detail
+        Exception.__init__(self, self.detail)
+
+    def __str__(self) -> str:
+        return self.detail
 
 
 class ServiceDocumentHTTPExceptions(HTTPException):
@@ -67,8 +74,3 @@ class ToolUseNotFoundHTTPException(ServiceDocumentHTTPExceptions):
 class StructuredOutputValidationHTTPException(ServiceDocumentHTTPExceptions):
     status_code = 422
     detail = "Structured output не прошёл валидацию"
-
-
-class LLMProviderHTTPException(ServiceDocumentHTTPExceptions):
-    status_code = 502
-    detail = "Ошибка провайдера LLM"
